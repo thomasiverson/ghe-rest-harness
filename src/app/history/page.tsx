@@ -131,7 +131,16 @@ export default function HistoryPage() {
               )}
             </div>
           </div>
-
+          {/* Diff viewer - above the table */}
+          {diffData && (
+            <DiffViewer
+              left={diffData.left}
+              right={diffData.right}
+              leftLabel={diffData.leftLabel}
+              rightLabel={diffData.rightLabel}
+              onClose={() => { setDiffData(null); setCompareIds(new Set()); }}
+            />
+          )}
           <div className="bg-panel border border-border rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -197,16 +206,6 @@ export default function HistoryPage() {
             </table>
           </div>
 
-          {/* Diff viewer */}
-          {diffData && (
-            <DiffViewer
-              left={diffData.left}
-              right={diffData.right}
-              leftLabel={diffData.leftLabel}
-              rightLabel={diffData.rightLabel}
-              onClose={() => { setDiffData(null); setCompareIds(new Set()); }}
-            />
-          )}
         </div>
       </div>
     </div>
@@ -294,7 +293,7 @@ function DiffViewer({ left, right, leftLabel, rightLabel, onClose }: {
   const diff = computeDiff(left, right);
 
   return (
-    <div className="mt-6 bg-panel border border-border rounded-lg overflow-hidden" ref={el => el?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+    <div className="mb-6 bg-panel border border-border rounded-lg overflow-hidden">
       <div className="p-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-text-primary">Response Comparison</span>
