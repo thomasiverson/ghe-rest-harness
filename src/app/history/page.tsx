@@ -1,0 +1,140 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { TopBar } from '@/components/TopBar';
+
+interface HistoryRow {
+  id: string; method: string; path: string; resolved_url: string;
+  status: number; timing: number; created_at: string;
+  operation_id: string | null; category: string | null;
+}
+
+const METHOD_COLORS: Record<string, string> = {
+  GET: 'method-get-bg', POST: 'method-post-bg', PUT: 'method-put-bg',
+  PATCH: 'method-patch-bg', DELETE: 'method-delete-bg',
+};
+
+export default function HistoryPage() {
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [filter, setFilter] = useState('');
+
+  useEffect(() => { loadHistory(); }, []);
+
+  async function loadHistory() {
+    const res = await fetch('/api/history?limit=200');
+    setHistory(await res.json());
+  }
+
+  async function deleteEntry(id: string) {
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id }),
+    });
+    setHistory(prev => prev.filter(h => h.id !== id));
+  }
+
+  async function clearAll() {
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'clear' }),
+    });
+    setHistory([]);
+  }
+
+  const filtered = filter
+    ? history.filter(h =>
+        h.path.toLowerCase().includes(filter.toLowerCase()) ||
+        h.method.toLowerCase().includes(filter.toLowerCase()) ||
+        (h.category || '').toLowerCase().includes(filter.toLowerCase())
+      )
+    : history;
+
+  function statusClass(status: number) {
+    if (status >= 500) return 'text-danger';
+    if (status >= 400) return 'text-warning';
+    if (status >= 300) return 'text-info';
+    return 'text-success';
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      <TopBar />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto py-8 px-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-semibold text-text-primary">Request History</h1>
+              <p className="text-sm text-text-secondary mt-1">{history.length} requests recorded</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="text" value={filter} onChange={e => setFilter(e.target.value)}
+                placeholder="Filter..."
+                className="bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-accent w-60"
+              />
+              {history.length > 0 && (
+                <button onClick={clearAll}
+                  className="px-3 py-1.5 text-sm text-danger border border-border rounded-md hover:bg-surface transition-colors">
+                  Clear All
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-panel border border-border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-text-secondary text-left">
+                  <th className="px-4 py-2 font-medium">Method</th>
+                  <th className="px-4 py-2 font-medium">Path</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 font-medium">Time</th>
+                  <th className="px-4 py-2 font-medium">When</th>
+                  <th className="px-4 py-2 font-medium w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(h => (
+                  <tr key={h.id} className="border-b border-border hover:bg-surface/50 transition-colors">
+                    <td className="px-4 py-2">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${METHOD_COLORS[h.method] || 'bg-text-muted'} leading-none`}>
+                        {h.method}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-mono text-text-primary truncate max-w-md">
+                      <a href={`/?replay=${h.id}`} className="hover:text-accent transition-colors">{h.path}</a>
+                    </td>
+                    <td className={`px-4 py-2 font-mono font-bold ${statusClass(h.status)}`}>
+                      {h.status}
+                    </td>
+                    <td className="px-4 py-2 text-text-secondary">{h.timing}ms</td>
+                    <td className="px-4 py-2 text-text-muted">
+                      {new Date(h.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2">
+                      <button onClick={() => deleteEntry(h.id)}
+                        className="text-text-muted hover:text-danger transition-colors p-1">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.748 1.748 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-text-muted">
+                      {history.length === 0 ? 'No history yet' : 'No matching results'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
