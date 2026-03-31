@@ -78,8 +78,8 @@ export default function HistoryPage() {
       ids.map(id => fetch(`/api/history?id=${id}`).then(r => r.json()))
     );
     setDiffData({
-      left: a.response_body ? JSON.parse(a.response_body) : null,
-      right: b.response_body ? JSON.parse(b.response_body) : null,
+      left: safeParseJson(a.response_body),
+      right: safeParseJson(b.response_body),
       leftLabel: `${a.method} ${a.path} (${new Date(a.created_at).toLocaleString()})`,
       rightLabel: `${b.method} ${b.path} (${new Date(b.created_at).toLocaleString()})`,
     });
@@ -196,13 +196,13 @@ export default function HistoryPage() {
                 <div className="flex-1 border-r border-border">
                   <div className="px-3 py-2 bg-surface text-xs text-text-secondary font-mono truncate">{diffData.leftLabel}</div>
                   <pre className="p-3 text-xs font-mono text-text-secondary whitespace-pre-wrap break-all max-h-96 overflow-auto">
-                    {JSON.stringify(diffData.left, null, 2)}
+                    {typeof diffData.left === 'string' ? diffData.left : JSON.stringify(diffData.left, null, 2)}
                   </pre>
                 </div>
                 <div className="flex-1">
                   <div className="px-3 py-2 bg-surface text-xs text-text-secondary font-mono truncate">{diffData.rightLabel}</div>
                   <pre className="p-3 text-xs font-mono text-text-secondary whitespace-pre-wrap break-all max-h-96 overflow-auto">
-                    {JSON.stringify(diffData.right, null, 2)}
+                    {typeof diffData.right === 'string' ? diffData.right : JSON.stringify(diffData.right, null, 2)}
                   </pre>
                 </div>
               </div>
@@ -212,4 +212,14 @@ export default function HistoryPage() {
       </div>
     </div>
   );
+}
+
+function safeParseJson(body: string | null | undefined): unknown {
+  if (!body) return null;
+  try {
+    return JSON.parse(body);
+  } catch {
+    // Truncated or invalid JSON — return as raw string
+    return body;
+  }
 }
