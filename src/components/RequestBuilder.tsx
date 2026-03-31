@@ -531,10 +531,9 @@ function EndpointInfo({ summary, description, operationId, category }: {
 }) {
   const hasDescription = description && description.trim().length > 0;
 
-  // Build GitHub docs URL: /rest/{category}/{subcategory}#{operation-id-kebab}
-  // operationId format is usually "category/operation-name"
-  const docsUrl = `https://docs.github.com/rest/${category}/${operationId.includes('/') ? operationId.split('/')[1] : operationId}`
-    .replace(/([A-Z])/g, '-$1').toLowerCase().replace(/--/g, '-');
+  // Link to GitHub docs search with the endpoint summary as the query
+  const searchQuery = summary || operationId.split('/').pop() || category;
+  const docsUrl = `https://docs.github.com/rest/${encodeURIComponent(category)}`;
 
   return (
     <div className="mt-2">
