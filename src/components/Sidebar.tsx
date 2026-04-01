@@ -49,12 +49,12 @@ export function Sidebar() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoriteEndpoints, setFavoriteEndpoints] = useState<EndpointRow[]>([]);
   const [specVersions, setSpecVersions] = useState<Array<{ spec_version: string; count: number }>>([]);
-  const [selectedVersion, setSelectedVersion] = useState<string>('');
+  const [selectedVersion, setSelectedVersion] = useState<string>('api.github.com');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadCategories();
+    loadCategories('api.github.com');
     loadFavorites();
     // Keyboard shortcut: Cmd/Ctrl+K
     const handler = (e: KeyboardEvent) => {
