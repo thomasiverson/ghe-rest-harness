@@ -258,22 +258,37 @@ export default function CollectionsPage() {
                     <span className="text-danger font-medium">{runResults.filter(r => r.status === 0 || r.status >= 400).length} failed</span>
                     <span className="text-text-muted">{Math.round(runResults.reduce((a, r) => a + r.timing, 0))}ms total</span>
                   </div>
-                  {/* Key findings from successful responses */}
-                  <div className="p-3 space-y-1.5">
-                    {runResults.filter(r => r.status >= 200 && r.status < 300 && r.responseBody).map(r => (
-                      <div key={r.itemId} className="text-xs text-text-secondary flex gap-2">
-                        <span className="text-success shrink-0">✓</span>
-                        <span className="font-mono text-text-muted shrink-0">{r.path?.split('/').pop()}</span>
-                        <span>{summarizeResponse(r.path || '', r.responseBody)}</span>
-                      </div>
-                    ))}
-                    {runResults.filter(r => r.status === 0 || r.status >= 400).map(r => (
-                      <div key={r.itemId} className="text-xs text-danger flex gap-2">
-                        <span className="shrink-0">✗</span>
-                        <span className="font-mono text-text-muted shrink-0">{r.path?.split('/').pop()}</span>
-                        <span>{r.error || `HTTP ${r.status}`}</span>
-                      </div>
-                    ))}
+                  {/* Key findings */}
+                  <div className="p-3 space-y-3">
+                    {runResults.map(r => {
+                      const info = describeEndpoint(r.path || '');
+                      const isSuccess = r.status >= 200 && r.status < 300;
+                      return (
+                        <div key={r.itemId} className="text-xs">
+                          <div className="flex items-start gap-2">
+                            <span className={`shrink-0 mt-0.5 ${isSuccess ? 'text-success' : 'text-danger'}`}>
+                              {isSuccess ? '✓' : '✗'}
+                            </span>
+                            <div className="flex-1">
+                              <div className="font-medium text-text-primary">{info.title}</div>
+                              {isSuccess && r.responseBody ? (
+                                <div className="text-text-secondary mt-0.5">
+                                  {summarizeResponse(r.path || '', r.responseBody)}
+                                </div>
+                              ) : (
+                                <div className="text-danger mt-0.5">
+                                  {r.error || `HTTP ${r.status}`}
+                                  {info.errorHint && r.status >= 400 && (
+                                    <span className="text-text-muted ml-1">— {info.errorHint}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-text-muted shrink-0">{r.timing}ms</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -344,26 +359,114 @@ export default function CollectionsPage() {
   );
 }
 
+function describeEndpoint(path: string): { title: string; errorHint: string } {
+  const descriptions: Record<string, { title: string; errorHint: string }> = {
+    '/orgs/{org}/copilot/billing': { title: 'Copilot Billing Summary', errorHint: 'Copilot may not be enabled for this org' },
+    '/orgs/{org}/copilot/billing/seats': { title: 'Copilot Seat Assignments', errorHint: 'Requires manage_billing:copilot or read:org scope' },
+    '/orgs/{org}/copilot/metrics': { title: 'Copilot Usage Metrics', errorHint: 'Metrics API may not be available for your plan' },
+    '/orgs/{org}/copilot/coding-agent/permissions': { title: 'Copilot Coding Agent Permissions', errorHint: 'Coding agent feature may not be enabled' },
+    '/orgs/{org}/copilot/coding-agent/permissions/repositories': { title: 'Coding Agent Repository Permissions', errorHint: 'Coding agent may need to be enabled first' },
+    '/orgs/{org}/copilot/content_exclusion': { title: 'Copilot Content Exclusion Rules', errorHint: 'Requires Copilot Business or Enterprise' },
+    '/orgs/{org}': { title: 'Organization Details', errorHint: 'Org not found or insufficient permissions' },
+    '/orgs/{org}/members': { title: 'Organization Members', errorHint: 'Requires org:read scope' },
+    '/orgs/{org}/teams': { title: 'Organization Teams', errorHint: 'Requires read:org scope' },
+    '/orgs/{org}/repos': { title: 'Organization Repositories', errorHint: 'Requires repo scope for private repos' },
+    '/orgs/{org}/outside_collaborators': { title: 'Outside Collaborators', errorHint: 'Requires org admin access' },
+    '/orgs/{org}/hooks': { title: 'Organization Webhooks', errorHint: 'Requires admin:org_hook scope' },
+    '/orgs/{org}/installations': { title: 'GitHub App Installations', errorHint: 'Requires admin:read scope' },
+    '/orgs/{org}/actions/runners': { title: 'Self-Hosted Runners', errorHint: 'Requires admin:org scope' },
+    '/orgs/{org}/actions/secrets': { title: 'Organization Action Secrets', errorHint: 'Requires admin:org scope' },
+    '/orgs/{org}/actions/variables': { title: 'Organization Action Variables', errorHint: 'Requires admin:org scope' },
+    '/orgs/{org}/actions/permissions': { title: 'Actions Permissions', errorHint: 'Requires admin:org scope' },
+    '/orgs/{org}/code-scanning/alerts': { title: 'Code Scanning Alerts', errorHint: 'Code scanning may not be enabled' },
+    '/orgs/{org}/secret-scanning/alerts': { title: 'Secret Scanning Alerts', errorHint: 'Secret scanning may not be enabled' },
+    '/orgs/{org}/dependabot/alerts': { title: 'Dependabot Alerts', errorHint: 'Dependabot may not be enabled' },
+    '/user': { title: 'Authenticated User Profile', errorHint: 'Token may be invalid' },
+    '/user/orgs': { title: 'Your Organizations', errorHint: 'Token needs read:org scope' },
+    '/enterprises/{enterprise}/teams': { title: 'Enterprise Teams', errorHint: 'Requires enterprise admin access' },
+    '/repos/{owner}/{repo}': { title: 'Repository Details', errorHint: 'Repo not found or insufficient access' },
+    '/repos/{owner}/{repo}/branches': { title: 'Repository Branches', errorHint: 'Requires repo read access' },
+    '/repos/{owner}/{repo}/pulls': { title: 'Pull Requests', errorHint: 'Requires repo read access' },
+    '/repos/{owner}/{repo}/issues': { title: 'Repository Issues', errorHint: 'Requires repo read access' },
+  };
+
+  const info = descriptions[path];
+  if (info) return info;
+
+  // Generate a title from the path
+  const parts = path.split('/').filter(p => p && !p.startsWith('{'));
+  const title = parts.slice(-2).join(' / ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return { title: title || path, errorHint: 'Check permissions and endpoint availability' };
+}
+
 function summarizeResponse(path: string, body: unknown): string {
-  if (!body || typeof body !== 'object') return String(body || '');
+  if (!body || typeof body !== 'object') return String(body || '(empty response)');
   const b = body as Record<string, unknown>;
 
-  // Try to extract meaningful summary based on common response patterns
-  if (b.total_seats !== undefined) return `${b.total_seats} total Copilot seats assigned`;
+  // Copilot billing
   if (b.seat_breakdown) {
     const sb = b.seat_breakdown as Record<string, unknown>;
-    return `${sb.total || 0} seats (${sb.active_this_cycle || 0} active, ${sb.inactive_this_cycle || 0} inactive)`;
+    const parts = [`${sb.total || 0} total seats`];
+    if (sb.active_this_cycle) parts.push(`${sb.active_this_cycle} active this cycle`);
+    if (sb.inactive_this_cycle) parts.push(`${sb.inactive_this_cycle} inactive`);
+    if (b.seat_management_setting) parts.push(`management: ${b.seat_management_setting}`);
+    return parts.join(' · ');
   }
-  if (b.total_count !== undefined) return `${b.total_count} total items`;
-  if (Array.isArray(b)) return `${b.length} items returned`;
-  if (b.seats && Array.isArray(b.seats)) return `${(b.seats as unknown[]).length} seats in response`;
-  if (b.enabled !== undefined) return `enabled: ${b.enabled}`;
-  if (b.organization) return `org: ${(b.organization as Record<string, unknown>).login || 'unknown'}`;
-  if (b.login) return `user: ${b.login}`;
-  if (b.name) return String(b.name);
 
-  // Count top-level keys as a fallback
-  const keys = Object.keys(b);
-  if (keys.length <= 5) return keys.join(', ');
-  return `${keys.length} fields returned`;
+  // Copilot seats list
+  if (b.total_seats !== undefined && b.seats) {
+    const seats = b.seats as Array<Record<string, unknown>>;
+    const assignees = seats.map(s => {
+      const a = s.assignee as Record<string, unknown> | null;
+      return a?.login || 'unknown';
+    }).slice(0, 5);
+    return `${b.total_seats} seat(s) assigned to: ${assignees.join(', ')}${seats.length > 5 ? ` +${seats.length - 5} more` : ''}`;
+  }
+
+  // Copilot coding agent permissions
+  if (b.enabled_repositories !== undefined) {
+    const repoSetting = b.enabled_repositories as string;
+    if (b.organization) {
+      return `Coding agent ${repoSetting === 'all' ? 'enabled for all repos' : repoSetting === 'none' ? 'disabled' : `enabled for ${repoSetting} repos`}`;
+    }
+    return `Repository access: ${repoSetting}`;
+  }
+
+  // Content exclusion
+  if (Array.isArray(b)) {
+    if (b.length === 0) return 'No items configured';
+    // Check if it's an array of users/members
+    if (b[0] && typeof b[0] === 'object' && 'login' in (b[0] as Record<string, unknown>)) {
+      const logins = b.slice(0, 5).map(item => (item as Record<string, unknown>).login);
+      return `${b.length} items: ${logins.join(', ')}${b.length > 5 ? ` +${b.length - 5} more` : ''}`;
+    }
+    return `${b.length} items returned`;
+  }
+
+  // Org details
+  if (b.login && b.type === 'Organization') {
+    const parts = [b.login as string];
+    if (b.plan) parts.push(`plan: ${(b.plan as Record<string, unknown>).name}`);
+    if (b.total_private_repos !== undefined) parts.push(`${b.total_private_repos} private repos`);
+    if (b.members_can_create_repositories !== undefined) parts.push(`member repo creation: ${b.members_can_create_repositories ? 'yes' : 'no'}`);
+    return parts.join(' · ');
+  }
+
+  // User profile
+  if (b.login && b.type === 'User') {
+    return `Logged in as ${b.login}${b.name ? ` (${b.name})` : ''}${b.email ? ` · ${b.email}` : ''}`;
+  }
+
+  // Generic count-based responses
+  if (b.total_count !== undefined) return `${b.total_count} total items`;
+
+  // Generic object — list key fields with values
+  const interesting = Object.entries(b)
+    .filter(([k, v]) => v !== null && v !== undefined && typeof v !== 'object' && !k.startsWith('_') && k !== 'url' && !k.endsWith('_url'))
+    .slice(0, 4)
+    .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`);
+  
+  if (interesting.length > 0) return interesting.join(' · ');
+
+  return `${Object.keys(b).length} fields returned`;
 }
