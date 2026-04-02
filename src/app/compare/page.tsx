@@ -110,6 +110,43 @@ export default function ComparePage() {
 
   const importedSet = new Set(importedVersions.map(v => v.spec_version));
 
+  function exportReport() {
+    if (!diffResult) return;
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>API Version Comparison: ${fromVersion} → ${toVersion}</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:900px;margin:0 auto;padding:2rem;color:#1f2328;background:#fff}
+h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:2rem}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:1rem 0}
+th,td{border:1px solid #d0d7de;padding:6px 10px;text-align:left}
+th{background:#f6f8fa;font-weight:600}
+.added{color:#1a7f37;background:#dafbe1}.removed{color:#d1242f;background:#ffebe9}
+.changed{color:#9a6700;background:#fff8c5}.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700}
+.summary{display:flex;gap:1rem;margin:1rem 0}.card{flex:1;text-align:center;padding:1rem;border:1px solid #d0d7de;border-radius:8px}
+.card .num{font-size:1.5rem;font-weight:700}
+@media print{body{padding:0}}</style></head><body>
+<h1>API Version Comparison</h1>
+<p><strong>${fromVersion}</strong> → <strong>${toVersion}</strong> | Generated ${new Date().toLocaleString()}</p>
+<div class="summary">
+<div class="card"><div class="num" style="color:#1a7f37">${diffResult.summary.added}</div>Added</div>
+<div class="card"><div class="num" style="color:#d1242f">${diffResult.summary.removed}</div>Removed</div>
+<div class="card"><div class="num" style="color:#9a6700">${diffResult.summary.changed}</div>Changed</div>
+<div class="card"><div class="num" style="color:#656d76">${diffResult.summary.unchanged}</div>Unchanged</div>
+</div>
+<p>${diffResult.summary.totalFrom} endpoints in ${fromVersion} → ${diffResult.summary.totalTo} in ${toVersion}</p>
+${['added','removed','changed'].map(status => {
+  const entries = diffResult.entries.filter(e => e.status === status);
+  if (entries.length === 0) return '';
+  return `<h2>${status.charAt(0).toUpperCase()+status.slice(1)} (${entries.length})</h2>
+<table><tr><th>Method</th><th>Path</th><th>Category</th><th>Details</th></tr>
+${entries.map(e => `<tr class="${status}"><td>${e.method}</td><td><code>${e.path}</code></td><td>${e.category}</td><td>${e.changes?.join('; ') || e.summary}</td></tr>`).join('')}
+</table>`;
+}).join('')}
+</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  }
+
   // Filter entries
   const filtered = diffResult?.entries.filter(e => {
     if (filterStatus !== 'all' && e.status !== filterStatus) return false;
@@ -209,6 +246,10 @@ export default function ComparePage() {
                   placeholder="Search endpoints..."
                   className="bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-accent flex-1" />
                 <span className="text-xs text-text-muted">{filtered.length} results</span>
+                <button onClick={exportReport}
+                  className="px-3 py-1.5 border border-border text-text-secondary text-xs rounded-md hover:bg-surface transition-colors">
+                  Export Report
+                </button>
               </div>
 
               {/* Results table */}
