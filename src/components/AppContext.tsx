@@ -67,15 +67,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [responseCollapsed, setResponseCollapsed] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    // Check localStorage first, then system preference
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme');
-      if (saved === 'dark' || saved === 'light') return saved;
-      if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  // Detect theme on mount (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark' || saved === 'light') {
+      setTheme(saved);
+    } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+      setTheme('light');
     }
-    return 'dark';
-  });
+  }, []);
 
   // Apply theme on mount and listen for system changes
   useEffect(() => {
