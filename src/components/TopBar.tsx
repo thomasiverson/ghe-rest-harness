@@ -146,6 +146,9 @@ export function TopBar() {
         <a href="/webhooks" className="px-3 py-1 text-sm text-text-secondary hover:text-text-primary hover:bg-surface rounded-md transition-colors">
           Webhooks
         </a>
+        <a href="/graphql" className="px-3 py-1 text-sm text-text-secondary hover:text-text-primary hover:bg-surface rounded-md transition-colors">
+          GraphQL
+        </a>
         <a href="/settings" className="px-3 py-1 text-sm text-text-secondary hover:text-text-primary hover:bg-surface rounded-md transition-colors">
           Settings
         </a>
