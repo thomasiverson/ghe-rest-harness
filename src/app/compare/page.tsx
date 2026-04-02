@@ -110,7 +110,7 @@ export default function ComparePage() {
 
   const importedSet = new Set(importedVersions.map(v => v.spec_version));
 
-  function exportReport() {
+  function exportHtml() {
     if (!diffResult) return;
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>API Version Comparison: ${fromVersion} → ${toVersion}</title>
@@ -142,9 +142,34 @@ ${entries.map(e => `<tr class="${status}"><td>${e.method}</td><td><code>${e.path
 </table>`;
 }).join('')}
 </body></html>`;
-    const blob = new Blob([html], { type: 'text/html' });
+    downloadFile(html, `api-compare-${fromVersion}-vs-${toVersion}.html`, 'text/html');
+  }
+
+  function exportCsv() {
+    if (!diffResult) return;
+    const rows = [['Status', 'Method', 'Path', 'Category', 'Summary', 'Changes'].join(',')];
+    for (const e of diffResult.entries) {
+      if (e.status === 'unchanged') continue;
+      rows.push([
+        e.status,
+        e.method,
+        `"${e.path}"`,
+        e.category,
+        `"${(e.summary || '').replace(/"/g, '""')}"`,
+        `"${(e.changes?.join('; ') || '').replace(/"/g, '""')}"`,
+      ].join(','));
+    }
+    downloadFile(rows.join('\n'), `api-compare-${fromVersion}-vs-${toVersion}.csv`, 'text/csv');
+  }
+
+  function downloadFile(content: string, filename: string, type: string) {
+    const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // Filter entries
@@ -246,10 +271,16 @@ ${entries.map(e => `<tr class="${status}"><td>${e.method}</td><td><code>${e.path
                   placeholder="Search endpoints..."
                   className="bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-accent flex-1" />
                 <span className="text-xs text-text-muted">{filtered.length} results</span>
-                <button onClick={exportReport}
-                  className="px-3 py-1.5 border border-border text-text-secondary text-xs rounded-md hover:bg-surface transition-colors">
-                  Export Report
-                </button>
+                <div className="flex gap-1">
+                  <button onClick={exportHtml}
+                    className="px-3 py-1.5 border border-border text-text-secondary text-xs rounded-md hover:bg-surface transition-colors">
+                    Export HTML
+                  </button>
+                  <button onClick={exportCsv}
+                    className="px-3 py-1.5 border border-border text-text-secondary text-xs rounded-md hover:bg-surface transition-colors">
+                    Export CSV
+                  </button>
+                </div>
               </div>
 
               {/* Results table */}
