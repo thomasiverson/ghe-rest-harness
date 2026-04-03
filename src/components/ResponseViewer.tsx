@@ -328,11 +328,13 @@ function PreviewRenderer({ data }: { data: unknown }) {
   return <PreviewValue value={data} />;
 }
 
-function PreviewObject({ data }: { data: Record<string, unknown> }) {
+function PreviewObject({ data, depth = 0 }: { data: Record<string, unknown>; depth?: number }) {
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const entries = Object.entries(data);
-  // Separate image URLs, regular URLs, and other values
+  // Separate image URLs, regular URLs, nested objects, and other values
   const imageEntries: [string, string][] = [];
   const urlEntries: [string, string][] = [];
+  const nestedEntries: [string, unknown][] = [];
   const otherEntries: [string, unknown][] = [];
 
   for (const [key, value] of entries) {
@@ -342,8 +344,7 @@ function PreviewObject({ data }: { data: Record<string, unknown> }) {
       urlEntries.push([key, value]);
       URL_REGEX.lastIndex = 0; // reset regex state
     } else if (value !== null && typeof value === 'object') {
-      // Skip nested objects/arrays in preview — they're in the Body tab
-      otherEntries.push([key, '[object]']);
+      nestedEntries.push([key, value]);
     } else {
       otherEntries.push([key, value]);
     }
@@ -390,6 +391,57 @@ function PreviewObject({ data }: { data: Record<string, unknown> }) {
               <PreviewValue value={value} />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Nested objects/arrays */}
+      {nestedEntries.length > 0 && (
+        <div className="space-y-1 border-t border-border/50 pt-2 mt-2">
+          {nestedEntries.map(([key, value]) => {
+            const isExpanded = expandedKeys.has(key);
+            const isArray = Array.isArray(value);
+            const itemCount = isArray ? (value as unknown[]).length : Object.keys(value as object).length;
+            const label = isArray ? `${itemCount} item${itemCount !== 1 ? 's' : ''}` : `${itemCount} field${itemCount !== 1 ? 's' : ''}`;
+            return (
+              <div key={key}>
+                <button
+                  onClick={() => {
+                    const next = new Set(expandedKeys);
+                    if (isExpanded) next.delete(key); else next.add(key);
+                    setExpandedKeys(next);
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-mono text-text-muted hover:text-text-primary transition-colors w-full text-left"
+                >
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"
+                    className={`transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`}>
+                    <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z" />
+                  </svg>
+                  <span className="text-text-primary">{key}</span>
+                  <span className="text-text-muted">({label})</span>
+                </button>
+                {isExpanded && (
+                  <div className={`mt-1 ml-4 ${depth < 3 ? 'pl-3 border-l-2 border-border/50' : ''}`}>
+                    {isArray ? (
+                      <div className="space-y-2">
+                        {(value as unknown[]).map((item, i) => (
+                          <div key={i} className="bg-surface/30 border border-border/50 rounded-md p-2">
+                            <div className="text-[10px] text-text-muted mb-1">{key}[{i}]</div>
+                            {item && typeof item === 'object' && !Array.isArray(item) ? (
+                              <PreviewObject data={item as Record<string, unknown>} depth={depth + 1} />
+                            ) : (
+                              <PreviewValue value={item} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <PreviewObject data={value as Record<string, unknown>} depth={depth + 1} />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
