@@ -261,6 +261,21 @@ export function getEndpointsByCategory(category: string, specVersion?: string) {
   ).all(category);
 }
 
+export function lookupCategory(operationId: string | null, path: string): string | null {
+  if (operationId) {
+    const row = getDb().prepare(
+      'SELECT category FROM endpoints WHERE operation_id = ? LIMIT 1'
+    ).get(operationId) as { category: string } | undefined;
+    if (row) return row.category;
+  }
+  // Try matching by path template
+  const row = getDb().prepare(
+    'SELECT category FROM endpoints WHERE path = ? LIMIT 1'
+  ).get(path) as { category: string } | undefined;
+  if (row) return row.category;
+  return null;
+}
+
 export function searchEndpoints(query: string, limit = 50, specVersion?: string) {
   const pattern = `%${query}%`;
   if (specVersion) {
@@ -380,6 +395,23 @@ export function clearHistory(environmentId?: string) {
   } else {
     getDb().prepare('DELETE FROM history').run();
   }
+}
+
+export function backfillHistoryCategories(): number {
+  const rows = getDb().prepare(
+    'SELECT id, operation_id, path FROM history WHERE category IS NULL'
+  ).all() as Array<{ id: string; operation_id: string | null; path: string }>;
+
+  const update = getDb().prepare('UPDATE history SET category = ? WHERE id = ?');
+  let count = 0;
+  for (const row of rows) {
+    const cat = lookupCategory(row.operation_id, row.path);
+    if (cat) {
+      update.run(cat, row.id);
+      count++;
+    }
+  }
+  return count;
 }
 
 // === Environment Variables CRUD ===

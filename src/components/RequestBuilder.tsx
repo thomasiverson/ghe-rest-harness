@@ -381,7 +381,7 @@ export function RequestBuilder() {
             }`}
           >
             {tab === 'params' ? `Parameters${selectedEndpoint.pathParams.length + selectedEndpoint.queryParams.length > 0 ? ` (${selectedEndpoint.pathParams.length + Object.values(queryValues).filter(v => v.enabled).length})` : ''}` :
-             tab === 'body' ? 'Body' : 'Headers'}
+             tab === 'body' ? <>Body{selectedEndpoint.bodySchema && (selectedEndpoint.bodySchema as Record<string, unknown>).required ? <span className="ml-1 text-warning text-xs">●</span> : ''}</> : 'Headers'}
           </button>
         ))}
       </div>

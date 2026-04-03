@@ -50,6 +50,7 @@ export default function CollectionsPage() {
     const res = await fetch('/api/collections');
     const data = await res.json();
     setCollections(data);
+    return data as Collection[];
   }
 
   async function createColl() {
@@ -63,8 +64,10 @@ export default function CollectionsPage() {
     setShowNewForm(false);
     setNewName('');
     setNewDesc('');
-    loadCollections();
+    const updated = await loadCollections();
     setSelectedId(data.id);
+    const coll = updated.find((c: Collection) => c.id === data.id);
+    if (coll) { setEditingName(coll.name); setEditingDesc(coll.description); }
   }
 
   async function deleteColl(id: string) {
@@ -229,7 +232,7 @@ export default function CollectionsPage() {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto py-6 px-6">
+            <div className="max-w-5xl mx-auto py-6 px-6">
               {/* Collection header */}
               <div className="flex items-start justify-between mb-6">
                 <div className="flex-1 space-y-2">
@@ -300,11 +303,19 @@ export default function CollectionsPage() {
                 {items.map((item, i) => {
                   const result = runResults.find(r => r.itemId === item.id);
                   const isExpanded = expandedItem === item.id;
+                  const pathParams = JSON.parse(item.path_params || '{}') as Record<string, string>;
+                  const queryParams = JSON.parse(item.query_params || '{}') as Record<string, string>;
+                  const resolvedPath = item.path.replace(/\{([\w-]+)\}/g, (_, key) => pathParams[key] || `{${key}}`);
+                  const queryString = Object.entries(queryParams).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join('&');
+                  const displayPath = resolvedPath + (queryString ? `?${queryString}` : '');
+                  const hasBody = item.body && ['POST', 'PUT', 'PATCH'].includes(item.method);
+                  let parsedBody: unknown = null;
+                  if (hasBody) { try { parsedBody = JSON.parse(item.body!); } catch { parsedBody = item.body; } }
                   return (
                     <div key={item.id}>
                       <div
-                        className={`flex items-center gap-2 p-2 bg-panel border border-border rounded-md hover:bg-surface/50 transition-colors ${result ? 'cursor-pointer' : ''}`}
-                        onClick={() => result && setExpandedItem(isExpanded ? null : item.id)}
+                        className={`flex items-center gap-2 p-2 bg-panel border border-border rounded-md hover:bg-surface/50 transition-colors cursor-pointer`}
+                        onClick={() => setExpandedItem(isExpanded ? null : item.id)}
                       >
                         <div className="flex flex-col gap-0.5" onClick={e => e.stopPropagation()}>
                           <button onClick={() => moveItem(i, -1)} disabled={i === 0}
@@ -315,7 +326,12 @@ export default function CollectionsPage() {
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${METHOD_COLORS[item.method] || 'bg-text-muted'} shrink-0`}>
                           {item.method}
                         </span>
-                        <span className="text-sm font-mono text-text-primary flex-1 truncate">{item.path}</span>
+                        {hasBody && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-accent/15 border border-accent/30 rounded text-accent font-bold shrink-0">BODY</span>
+                        )}
+                        <span className="text-sm font-mono text-text-primary flex-1 truncate" title={displayPath}>
+                          {displayPath}
+                        </span>
                         {result && (
                           <>
                             <span className={`text-xs font-mono font-bold ${
@@ -323,24 +339,61 @@ export default function CollectionsPage() {
                             }`}>
                               {result.status || 'ERR'} {result.timing}ms
                             </span>
-                            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"
-                              className={`text-text-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
-                              <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z" />
-                            </svg>
                           </>
                         )}
                         <button onClick={e => { e.stopPropagation(); deleteItem(item.id); }}
                           className="text-text-muted hover:text-danger p-1 text-xs">✕</button>
                       </div>
-                      {/* Expanded response */}
-                      {isExpanded && result && (
-                        <div className="ml-8 mt-1 mb-2 p-3 bg-surface/50 border border-border rounded-md">
-                          {result.error && (
-                            <div className="text-xs text-danger mb-2">Error: {result.error}</div>
+                      {/* Expanded detail */}
+                      {isExpanded && (
+                        <div className="ml-8 mt-1 mb-2 p-3 bg-surface/50 border border-border rounded-md space-y-3">
+                          {/* Path params */}
+                          {Object.keys(pathParams).length > 0 && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">Path Parameters</div>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(pathParams).map(([k, v]) => (
+                                  <span key={k} className="text-xs font-mono">
+                                    <span className="text-text-muted">{k}:</span> <span className="text-text-primary">{v || <span className="text-warning italic">not set</span>}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           )}
-                          <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap break-all max-h-64 overflow-auto">
-                            {JSON.stringify(result.responseBody, null, 2)}
-                          </pre>
+                          {/* Query params */}
+                          {Object.keys(queryParams).filter(k => queryParams[k]).length > 0 && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">Query Parameters</div>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(queryParams).filter(([, v]) => v).map(([k, v]) => (
+                                  <span key={k} className="text-xs font-mono">
+                                    <span className="text-text-muted">{k}:</span> <span className="text-text-primary">{v}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* Request body */}
+                          {hasBody && parsedBody && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">Request Body</div>
+                              <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap break-all max-h-40 overflow-auto bg-canvas rounded p-2 border border-border">
+                                {typeof parsedBody === 'string' ? parsedBody : JSON.stringify(parsedBody, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                          {/* Run result */}
+                          {result && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">Response</div>
+                              {result.error && (
+                                <div className="text-xs text-danger mb-2">Error: {result.error}</div>
+                              )}
+                              <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap break-all max-h-64 overflow-auto bg-canvas rounded p-2 border border-border">
+                                {JSON.stringify(result.responseBody, null, 2)}
+                              </pre>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

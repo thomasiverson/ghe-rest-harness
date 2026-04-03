@@ -224,6 +224,20 @@ ${entries.map(e => `<tr class="${status}"><td>${e.method}</td><td><code>${e.path
               </button>
             </div>
 
+            {/* Imported versions */}
+            {importedVersions.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-text-secondary mb-2">Imported versions:</p>
+                <div className="flex flex-wrap gap-2">
+                  {importedVersions.map(v => (
+                    <span key={v.spec_version} className="px-2.5 py-1 text-xs bg-surface border border-border rounded-md text-text-primary">
+                      {v.spec_version} <span className="text-text-muted">({v.count})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Import section */}
             <div className="mt-4 pt-4 border-t border-border">
               <p className="text-xs text-text-secondary mb-2">Import additional versions to compare:</p>

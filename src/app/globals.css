@@ -20,6 +20,8 @@
   --method-put: #d29922;
   --method-patch: #db6d28;
   --method-delete: #f85149;
+  --nav-active-bg: #1f2937;
+  --nav-active-border: #374151;
 }
 
 [data-theme="light"] {
@@ -41,6 +43,8 @@
   --method-put: #9a6700;
   --method-patch: #bc4c00;
   --method-delete: #d1242f;
+  --nav-active-bg: #e2e8f0;
+  --nav-active-border: #cbd5e1;
 }
 
 @theme inline {

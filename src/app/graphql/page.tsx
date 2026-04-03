@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { TopBar } from '@/components/TopBar';
+import { ResizeHandle } from '@/components/ResizablePanels';
 import { useApp } from '@/components/AppContext';
 
 const EXAMPLE_QUERIES = [
@@ -158,6 +159,14 @@ export default function GraphQLPage() {
   const [timing, setTiming] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'response' | 'errors'>('response');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [leftPct, setLeftPct] = useState(50);
+
+  const handleResize = useCallback((delta: number) => {
+    const containerWidth = containerRef.current?.offsetWidth || 1000;
+    const deltaPct = (delta / containerWidth) * 100;
+    setLeftPct(prev => Math.max(20, Math.min(80, prev + deltaPct)));
+  }, []);
 
   async function executeQuery() {
     if (!activeEnv) return;
@@ -202,9 +211,9 @@ export default function GraphQLPage() {
   return (
     <div className="h-full flex flex-col">
       <TopBar />
-      <div className="flex-1 flex overflow-hidden">
+      <div ref={containerRef} className="flex-1 flex overflow-hidden">
         {/* Left: Query editor */}
-        <div className="flex-1 flex flex-col border-r border-border min-w-0">
+        <div style={{ width: `${leftPct}%` }} className="flex flex-col border-r border-border min-w-0 shrink-0">
           {/* Toolbar */}
           <div className="p-3 border-b border-border flex items-center gap-2">
             <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">GraphQL</span>
@@ -256,6 +265,9 @@ export default function GraphQLPage() {
           </div>
         </div>
 
+        {/* Resize handle */}
+        <ResizeHandle onResize={handleResize} side="right" />
+
         {/* Right: Response */}
         <div className="flex-1 flex flex-col bg-panel min-w-0">
           {/* Response header */}
@@ -298,8 +310,58 @@ export default function GraphQLPage() {
                   : JSON.stringify(activeTab === 'response' && responseData?.data ? responseData.data : response, null, 2)}
               </pre>
             ) : (
-              <div className="flex items-center justify-center h-full text-text-muted text-sm">
-                {activeEnv ? 'Run a query to see results' : 'Configure an environment first'}
+              <div className="max-w-xl mx-auto py-8 space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary mb-2">What is GraphQL?</h2>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    GraphQL is a query language for APIs that lets you request <strong>exactly the data you need</strong> in a single request.
+                    Unlike REST, where each endpoint returns a fixed structure, GraphQL lets you specify which fields you want — no more, no less.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary mb-1.5">Why use GraphQL with GitHub?</h3>
+                  <ul className="text-sm text-text-secondary space-y-1.5 list-disc list-inside">
+                    <li><strong>Fewer requests</strong> — fetch repos, issues, PRs, and members in one call instead of many REST calls</li>
+                    <li><strong>No over-fetching</strong> — only get the fields you ask for, reducing payload size</li>
+                    <li><strong>Nested data</strong> — traverse relationships (e.g. org → teams → members) in a single query</li>
+                    <li><strong>Strongly typed</strong> — the schema tells you exactly what&apos;s available</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-text-primary mb-1.5">How to use this page</h3>
+                  <ol className="text-sm text-text-secondary space-y-1.5 list-decimal list-inside">
+                    <li>Pick an <strong>example query</strong> from the dropdown above, or write your own in the editor</li>
+                    <li>Fill in any <strong>variables</strong> in the panel below the query (JSON format)</li>
+                    <li>Click <strong>Run Query</strong> to execute — results appear here</li>
+                  </ol>
+                </div>
+
+                <div className="bg-surface border border-border rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-text-primary mb-2">Quick example</h3>
+                  <pre className="text-xs font-mono text-text-secondary whitespace-pre leading-relaxed">{`query {
+  viewer {       # The authenticated user
+    login        # Their username
+    name         # Their display name
+    repositories(first: 5) {
+      nodes {
+        name
+        stargazerCount
+      }
+    }
+  }
+}`}</pre>
+                  <p className="text-xs text-text-muted mt-2">
+                    This returns your username, name, and your first 5 repositories with their star counts — all in one request.
+                  </p>
+                </div>
+
+                <p className="text-xs text-text-muted">
+                  Learn more: <a href="https://docs.github.com/en/graphql" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">GitHub GraphQL API docs</a>
+                  {' · '}
+                  <a href="https://docs.github.com/en/graphql/overview/explorer" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">GitHub GraphQL Explorer</a>
+                </p>
               </div>
             )}
           </div>

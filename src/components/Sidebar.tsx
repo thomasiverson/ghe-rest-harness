@@ -281,9 +281,10 @@ export function Sidebar() {
             ))}
           </select>
         )}
+        <p className="text-[10px] text-text-muted mt-2">
+          Import additional API specs via <a href="/compare" className="text-accent hover:underline">Compare</a> or <a href="/settings" className="text-accent hover:underline">Settings</a>
+        </p>
       </div>
-
-      {/* Search */}
       <div className="p-2 border-b border-border">
         <div className="relative">
           <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">

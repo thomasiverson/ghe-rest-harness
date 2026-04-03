@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createOctokit } from '@/lib/auth';
-import { addHistory, getActiveEnvironment } from '@/lib/db';
+import { addHistory, getActiveEnvironment, lookupCategory } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
       responseBody: truncatedBody,
       responseHeaders: JSON.stringify(responseHeaders),
       operationId: operationId || null,
-      category: category || null,
+      category: category || lookupCategory(operationId || null, pathTemplate) || null,
     });
 
     return NextResponse.json({

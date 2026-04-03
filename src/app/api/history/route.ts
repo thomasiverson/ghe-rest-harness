@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getHistory, getHistoryEntry, deleteHistory, clearHistory } from '@/lib/db';
+import { getHistory, getHistoryEntry, deleteHistory, clearHistory, backfillHistoryCategories } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -28,6 +28,11 @@ export async function POST(request: Request) {
   if (action === 'clear') {
     clearHistory(body.environmentId);
     return NextResponse.json({ success: true });
+  }
+
+  if (action === 'backfill-categories') {
+    const count = backfillHistoryCategories();
+    return NextResponse.json({ success: true, updated: count });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

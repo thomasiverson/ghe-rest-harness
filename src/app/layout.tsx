@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GitHub REST API Harness",
+  title: "GitHub API Explorer",
   description: "Test and explore GitHub REST API endpoints for GitHub Enterprise EMU",
 };
 

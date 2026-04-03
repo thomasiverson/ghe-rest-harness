@@ -21,8 +21,36 @@ export default function SettingsPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [variables, setVariables] = useState<Variable[]>([]);
   const [selectedEnvForVars, setSelectedEnvForVars] = useState<string>('');
+  const [availableVersions, setAvailableVersions] = useState<string[]>([]);
+  const [importedVersions, setImportedVersions] = useState<Array<{ spec_version: string; count: number }>>([]);
+  const [importingVersion, setImportingVersion] = useState<string | null>(null);
 
-  useEffect(() => { loadEnvironments(); }, []);
+  useEffect(() => { loadEnvironments(); loadVersions(); }, []);
+
+  async function loadVersions() {
+    try {
+      const res = await fetch('/api/compare?action=versions');
+      const data = await res.json();
+      setImportedVersions(data.imported || []);
+      setAvailableVersions(data.available || []);
+    } catch { /* ignore */ }
+  }
+
+  async function importVersion(version: string) {
+    setImportingVersion(version);
+    try {
+      await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ specVersion: version }),
+      });
+      await loadVersions();
+      setImportStatus(`Imported ${version} successfully`);
+    } catch (err) {
+      setImportStatus(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+    setImportingVersion(null);
+  }
 
   useEffect(() => {
     if (selectedEnvForVars) loadVariables(selectedEnvForVars);
@@ -344,6 +372,34 @@ export default function SettingsPage() {
             </div>
             {importStatus && (
               <div className="p-4 text-sm text-text-secondary">{importStatus}</div>
+            )}
+            {/* Imported versions */}
+            {importedVersions.length > 0 && (
+              <div className="p-4 border-t border-border">
+                <p className="text-xs font-medium text-text-secondary mb-2">Imported Versions</p>
+                <div className="flex flex-wrap gap-2">
+                  {importedVersions.map(v => (
+                    <span key={v.spec_version} className="px-2.5 py-1 text-xs bg-surface border border-border rounded-md text-text-primary">
+                      {v.spec_version} <span className="text-text-muted">({v.count})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Import additional versions */}
+            {availableVersions.filter(v => !importedVersions.some(iv => iv.spec_version === v)).length > 0 && (
+              <div className="p-4 border-t border-border">
+                <p className="text-xs font-medium text-text-secondary mb-2">Import Additional API Versions</p>
+                <div className="flex flex-wrap gap-2">
+                  {availableVersions.filter(v => !importedVersions.some(iv => iv.spec_version === v)).slice(0, 12).map(v => (
+                    <button key={v} onClick={() => importVersion(v)}
+                      disabled={importingVersion !== null}
+                      className="px-2.5 py-1 text-xs border border-border rounded-md text-text-secondary hover:bg-surface disabled:opacity-50 transition-colors">
+                      {importingVersion === v ? 'Importing...' : `+ ${v}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </section>
         </div>

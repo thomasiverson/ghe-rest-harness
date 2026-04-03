@@ -7,6 +7,11 @@ interface HistoryRow {
   id: string; method: string; path: string; resolved_url: string;
   status: number; timing: number; created_at: string;
   operation_id: string | null; category: string | null;
+  request_body: string | null;
+}
+
+interface Collection {
+  id: string; name: string; description: string; item_count: number;
 }
 
 const METHOD_COLORS: Record<string, string> = {
@@ -32,8 +37,57 @@ export default function HistoryPage() {
   const [filter, setFilter] = useState('');
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [diffData, setDiffData] = useState<DiffDataFull | null>(null);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [addingToCollection, setAddingToCollection] = useState<string | null>(null);
+  const [addedFeedback, setAddedFeedback] = useState<string | null>(null);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { loadHistory(); loadCollections(); }, []);
+
+  async function loadCollections() {
+    const res = await fetch('/api/collections');
+    setCollections(await res.json());
+  }
+
+  async function addToCollection(collectionId: string, entries: HistoryRow[]) {
+    for (const h of entries) {
+      // Fetch full history entry to get request body
+      const fullRes = await fetch(`/api/history?id=${encodeURIComponent(h.id)}`);
+      const full = await fullRes.json();
+
+      // Extract path param values from resolved URL vs template
+      const pathParams = extractPathParamValues(h.path, h.resolved_url);
+
+      // Extract query params from resolved URL
+      const queryParams = extractQueryParams(h.resolved_url);
+
+      // Parse request body
+      let requestBody: string | null = null;
+      if (full?.request_body) {
+        requestBody = typeof full.request_body === 'string' ? full.request_body : JSON.stringify(full.request_body);
+      }
+
+      await fetch('/api/collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add-item',
+          collectionId,
+          method: h.method,
+          path: h.path,
+          operationId: h.operation_id,
+          pathParams,
+          queryParams,
+          body: requestBody,
+        }),
+      });
+    }
+    setAddingToCollection(null);
+    const collName = collections.find(c => c.id === collectionId)?.name || 'collection';
+    setAddedFeedback(`Added ${entries.length} item${entries.length > 1 ? 's' : ''} to ${collName}`);
+    setTimeout(() => setAddedFeedback(null), 3000);
+    loadCollections();
+  }
 
   async function loadHistory() {
     const res = await fetch('/api/history?limit=200');
@@ -78,7 +132,6 @@ export default function HistoryPage() {
     setCompareIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); } else {
-        if (next.size >= 2) return prev; // max 2
         next.add(id);
       }
       return next;
@@ -122,13 +175,37 @@ export default function HistoryPage() {
     <div className="h-full flex flex-col">
       <TopBar />
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto py-8 px-6">
+        <div className="mx-auto py-8 px-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-semibold text-text-primary">Request History</h1>
               <p className="text-sm text-text-secondary mt-1">{history.length} requests recorded</p>
             </div>
             <div className="flex items-center gap-3">
+              {compareIds.size > 0 && (
+                <div className="relative">
+                  <button onClick={() => setAddingToCollection(addingToCollection === 'bulk' ? null : 'bulk')}
+                    className="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-surface transition-colors text-text-secondary">
+                    Add {compareIds.size} to Collection
+                  </button>
+                  {addingToCollection === 'bulk' && (
+                    <div className="absolute right-0 top-full mt-1 w-56 bg-panel border border-border rounded-lg shadow-lg z-50 py-1">
+                      {collections.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-text-muted">No collections yet</div>
+                      ) : collections.map(c => (
+                        <button key={c.id}
+                          onClick={() => addToCollection(c.id, history.filter(h => compareIds.has(h.id)))}
+                          className="w-full text-left px-3 py-1.5 text-sm text-text-primary hover:bg-surface transition-colors">
+                          {c.name} <span className="text-text-muted">({c.item_count})</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {addedFeedback && (
+                <span className="text-xs text-success">{addedFeedback}</span>
+              )}
               {compareIds.size === 2 && (
                 <button onClick={showDiff}
                   className="px-3 py-1.5 bg-accent-emphasis text-white text-sm rounded-md hover:opacity-90 transition-opacity">
@@ -161,27 +238,37 @@ export default function HistoryPage() {
                 <tr className="border-b border-border text-text-secondary text-left">
                   <th className="px-2 py-2 w-8"></th>
                   <th className="px-4 py-2 font-medium">Method</th>
+                  <th className="px-4 py-2 font-medium">Category</th>
                   <th className="px-4 py-2 font-medium">Path</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                   <th className="px-4 py-2 font-medium">Time</th>
                   <th className="px-4 py-2 font-medium">When</th>
-                  <th className="px-4 py-2 font-medium w-16"></th>
+                  <th className="px-4 py-2 font-medium w-16">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {(() => {
                   const maxTiming = Math.max(...filtered.map(h => h.timing), 1);
                   return filtered.map(h => (
-                  <tr key={h.id} className="border-b border-border hover:bg-surface/50 transition-colors">
-                    <td className="px-2 py-2">
+                  <React.Fragment key={h.id}>
+                  <tr className="border-b border-border hover:bg-surface/50 transition-colors cursor-pointer"
+                    onClick={() => setExpandedRow(expandedRow === h.id ? null : h.id)}>
+                    <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={compareIds.has(h.id)}
-                        onChange={() => toggleCompare(h.id)} className="accent-accent"
-                        disabled={!compareIds.has(h.id) && compareIds.size >= 2} />
+                        onChange={() => toggleCompare(h.id)} className="accent-accent" />
                     </td>
                     <td className="px-4 py-2">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${METHOD_COLORS[h.method] || 'bg-text-muted'} leading-none`}>
-                        {h.method}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${METHOD_COLORS[h.method] || 'bg-text-muted'} shrink-0`}>
+                          {h.method}
+                        </span>
+                        {h.request_body && ['POST', 'PUT', 'PATCH'].includes(h.method) && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-accent/15 border border-accent/30 rounded text-accent font-bold">BODY</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-text-secondary">
+                      {h.category || '—'}
                     </td>
                     <td className="px-4 py-2 font-mono text-text-primary truncate max-w-md" title={`${h.resolved_url}\n\nTemplate: ${h.path}`}>
                       {getDisplayPath(h.resolved_url, h.path)}
@@ -209,6 +296,27 @@ export default function HistoryPage() {
                             <path d="M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z" />
                           </svg>
                         </a>
+                        <div className="relative">
+                          <button onClick={() => setAddingToCollection(addingToCollection === h.id ? null : h.id)}
+                            className="text-text-muted hover:text-accent transition-colors p-1" title="Add to collection">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                              <path d="M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 10.25 10H7.061l-2.574 2.573A1.458 1.458 0 0 1 2 11.543V10h-.25A1.75 1.75 0 0 1 0 8.25v-5.5C0 1.784.784 1 1.75 1ZM1.5 2.75v5.5c0 .138.112.25.25.25h1a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h3.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25Zm13 2a.25.25 0 0 0-.25-.25h-.5a.75.75 0 0 1 0-1.5h.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 14.25 12H14v1.543a1.458 1.458 0 0 1-2.487 1.03L9.22 12.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.22 2.22V11.25a.75.75 0 0 1 .75-.75h.5a.25.25 0 0 0 .25-.25v-5.5ZM7 5.5a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 5.5Zm-3 0a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 4 5.5Z" />
+                            </svg>
+                          </button>
+                          {addingToCollection === h.id && (
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-panel border border-border rounded-lg shadow-lg z-50 py-1">
+                              {collections.length === 0 ? (
+                                <div className="px-3 py-2 text-xs text-text-muted">No collections yet</div>
+                              ) : collections.map(c => (
+                                <button key={c.id}
+                                  onClick={() => addToCollection(c.id, [h])}
+                                  className="w-full text-left px-3 py-1.5 text-sm text-text-primary hover:bg-surface transition-colors">
+                                  {c.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <button onClick={() => deleteEntry(h.id)}
                           className="text-text-muted hover:text-danger transition-colors p-1" title="Delete">
                           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -218,11 +326,59 @@ export default function HistoryPage() {
                       </div>
                     </td>
                   </tr>
+                  {expandedRow === h.id && (() => {
+                    const pathParams = extractPathParamValues(h.path, h.resolved_url);
+                    const queryParams = extractQueryParams(h.resolved_url);
+                    const hasPathParams = Object.keys(pathParams).length > 0;
+                    const hasQueryParams = Object.keys(queryParams).length > 0;
+                    const hasBody = h.request_body && ['POST', 'PUT', 'PATCH'].includes(h.method);
+                    return (
+                    <tr className="border-b border-border">
+                      <td colSpan={8} className="px-4 py-3 bg-surface/30">
+                        <div className="space-y-3">
+                          {hasPathParams && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">Path Parameters</div>
+                              <div className="flex flex-wrap gap-3">
+                                {Object.entries(pathParams).map(([k, v]) => (
+                                  <span key={k} className="text-xs font-mono">
+                                    <span className="text-text-muted">{k}:</span> <span className="text-text-primary">{v}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {hasQueryParams && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">Query Parameters</div>
+                              <div className="flex flex-wrap gap-3">
+                                {Object.entries(queryParams).map(([k, v]) => (
+                                  <span key={k} className="text-xs font-mono">
+                                    <span className="text-text-muted">{k}:</span> <span className="text-text-primary">{v}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {hasBody && (
+                            <div>
+                              <div className="text-[10px] font-semibold text-text-muted uppercase mb-1">Request Body</div>
+                              <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap break-all max-h-48 overflow-auto bg-canvas rounded p-2 border border-border">
+                                {(() => { try { return JSON.stringify(JSON.parse(h.request_body!), null, 2); } catch { return h.request_body; } })()}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    );
+                  })()}
+                  </React.Fragment>
                 ));
                 })()}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-text-muted">
+                    <td colSpan={8} className="px-4 py-8 text-center text-text-muted">
                       {history.length === 0 ? 'No history yet' : 'No matching results'}
                     </td>
                   </tr>
@@ -244,6 +400,34 @@ function getDisplayPath(resolvedUrl: string, templatePath: string): string {
   } catch {
     return templatePath;
   }
+}
+
+function extractPathParamValues(templatePath: string, resolvedUrl: string): Record<string, string> {
+  const params: Record<string, string> = {};
+  try {
+    const url = new URL(resolvedUrl);
+    const resolvedPath = url.pathname;
+    const templateParts = templatePath.split('/');
+    const resolvedParts = resolvedPath.split('/');
+    for (let i = 0; i < templateParts.length; i++) {
+      const match = templateParts[i].match(/^\{([\w-]+)\}$/);
+      if (match && resolvedParts[i]) {
+        params[match[1]] = decodeURIComponent(resolvedParts[i]);
+      }
+    }
+  } catch { /* ignore */ }
+  return params;
+}
+
+function extractQueryParams(resolvedUrl: string): Record<string, string> {
+  const params: Record<string, string> = {};
+  try {
+    const url = new URL(resolvedUrl);
+    url.searchParams.forEach((value, key) => {
+      params[key] = value;
+    });
+  } catch { /* ignore */ }
+  return params;
 }
 
 function safeParseJson(body: string | null | undefined): unknown {
