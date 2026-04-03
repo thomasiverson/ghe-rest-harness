@@ -298,9 +298,9 @@ export function RequestBuilder() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-canvas min-w-0">
+    <div className="flex-1 flex flex-col bg-canvas min-w-0 overflow-x-hidden">
       {/* URL Bar */}
-      <div className="p-3 border-b border-border">
+      <div className="p-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <span className={`text-xs font-bold px-2.5 py-1 rounded ${METHOD_BG[selectedEndpoint.method] || 'bg-text-muted'} text-white shrink-0`}>
             {selectedEndpoint.method}
@@ -352,24 +352,29 @@ export function RequestBuilder() {
             Batch
           </button>
         </div>
+      </div>
+
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto min-h-0">
         {/* Endpoint info */}
         {selectedEndpoint.summary && (
-          <EndpointInfo
-            summary={selectedEndpoint.summary}
-            description={selectedEndpoint.description}
-            operationId={selectedEndpoint.operationId}
-            category={selectedEndpoint.category}
-            specVersion={selectedEndpoint.specVersion}
-          />
+          <div className="px-3 pt-2">
+            <EndpointInfo
+              summary={selectedEndpoint.summary}
+              description={selectedEndpoint.description}
+              operationId={selectedEndpoint.operationId}
+              category={selectedEndpoint.category}
+              specVersion={selectedEndpoint.specVersion}
+            />
+          </div>
         )}
-      </div>
 
       {/* Batch panel */}
       {/* Batch values input - shown in place of the batch runner panel */}
       {/* (now integrated into params tab below) */}
 
       {/* Tabs */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border sticky top-0 bg-canvas z-10">
         {(['params', 'body', 'headers'] as const).map(tab => (
           <button
             key={tab}
@@ -387,7 +392,7 @@ export function RequestBuilder() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="p-3">
         {activeTab === 'params' && (
           <div className="space-y-4">
             {/* Path params */}
@@ -610,6 +615,7 @@ export function RequestBuilder() {
           </div>
         )}
       </div>
+      </div>{/* end scrollable content area */}
     </div>
   );
 }
@@ -650,6 +656,7 @@ function isValidJson(text: string): boolean {
 function EndpointInfo({ summary, description, operationId, category, specVersion }: {
   summary: string; description: string; operationId: string; category: string; specVersion: string;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
   const hasDescription = description && description.trim().length > 0;
 
   // Build version-aware GitHub docs URL
@@ -676,8 +683,22 @@ function EndpointInfo({ summary, description, operationId, category, specVersion
         </a>
       </div>
       {hasDescription && (
-        <div className="mt-1.5 p-2.5 bg-surface/50 border border-border rounded-md text-xs text-text-secondary leading-relaxed space-y-1.5">
-          <SimpleMarkdown text={description} />
+        <div className="mt-1.5">
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="text-[11px] text-text-muted hover:text-text-primary flex items-center gap-1 mb-1 transition-colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"
+              className={`transition-transform ${collapsed ? '' : 'rotate-90'}`}>
+              <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z" />
+            </svg>
+            {collapsed ? 'Show description' : 'Hide description'}
+          </button>
+          {!collapsed && (
+            <div className="p-2.5 bg-surface/50 border border-border rounded-md text-xs text-text-secondary leading-relaxed space-y-1.5">
+              <SimpleMarkdown text={description} />
+            </div>
+          )}
         </div>
       )}
     </div>

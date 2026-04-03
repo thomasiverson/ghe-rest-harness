@@ -122,7 +122,7 @@ export function ResizablePanels({
       {!leftCollapsed && <ResizeHandle onResize={handleLeftResize} side="right" />}
 
       {/* Center panel */}
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-x-hidden">
         {center}
       </div>
 

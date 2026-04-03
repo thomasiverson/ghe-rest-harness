@@ -387,21 +387,58 @@ export function Sidebar() {
                 </button>
                 {expandedCategories.has(cat.category) && categoryEndpoints[cat.category] && (
                   <div>
-                    {categoryEndpoints[cat.category].map(ep => (
-                      <EndpointItem
-                        key={ep.id}
-                        endpoint={ep}
-                        isActive={selectedEndpoint?.operationId === ep.operation_id}
-                        isBulkSelected={bulkSelected.has(ep.id)}
-                        bulkResult={bulkResults[ep.id]}
-                        isFavorite={favorites.has(ep.operation_id)}
-                        onToggleFavorite={() => toggleFavorite(ep.operation_id)}
-                        onClick={(e) => {
-                          if (toggleBulkSelect(ep.id, e)) return;
-                          handleSelectEndpoint(ep);
-                        }}
-                      />
-                    ))}
+                    {(() => {
+                      const eps = categoryEndpoints[cat.category];
+                      const subcats = new Map<string, EndpointRow[]>();
+                      for (const ep of eps) {
+                        const sub = ep.subcategory || '';
+                        if (!subcats.has(sub)) subcats.set(sub, []);
+                        subcats.get(sub)!.push(ep);
+                      }
+                      // If only one subcategory (or none), render flat
+                      if (subcats.size <= 1) {
+                        return eps.map(ep => (
+                          <EndpointItem
+                            key={ep.id}
+                            endpoint={ep}
+                            isActive={selectedEndpoint?.operationId === ep.operation_id}
+                            isBulkSelected={bulkSelected.has(ep.id)}
+                            bulkResult={bulkResults[ep.id]}
+                            isFavorite={favorites.has(ep.operation_id)}
+                            onToggleFavorite={() => toggleFavorite(ep.operation_id)}
+                            onClick={(e) => {
+                              if (toggleBulkSelect(ep.id, e)) return;
+                              handleSelectEndpoint(ep);
+                            }}
+                          />
+                        ));
+                      }
+                      // Multiple subcategories — render grouped
+                      return Array.from(subcats.entries()).map(([sub, subEps]) => (
+                        <div key={sub || '_none'}>
+                          {sub && (
+                            <div className="px-5 py-1 text-[10px] font-semibold text-text-muted uppercase tracking-wider">
+                              {sub}
+                            </div>
+                          )}
+                          {subEps.map(ep => (
+                            <EndpointItem
+                              key={ep.id}
+                              endpoint={ep}
+                              isActive={selectedEndpoint?.operationId === ep.operation_id}
+                              isBulkSelected={bulkSelected.has(ep.id)}
+                              bulkResult={bulkResults[ep.id]}
+                              isFavorite={favorites.has(ep.operation_id)}
+                              onToggleFavorite={() => toggleFavorite(ep.operation_id)}
+                              onClick={(e) => {
+                                if (toggleBulkSelect(ep.id, e)) return;
+                                handleSelectEndpoint(ep);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ));
+                    })()}
                   </div>
                 )}
               </div>
