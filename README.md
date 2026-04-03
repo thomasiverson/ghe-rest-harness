@@ -1,8 +1,8 @@
-# GitHub REST API Harness
+# GitHub API Explorer
 
-A browser-based test harness for exploring and executing GitHub REST API endpoints against GitHub Enterprise EMU (or any GitHub instance). Built for developers and admins who need to discover, test, and debug API calls without leaving the browser.
+A browser-based tool for exploring, testing, and comparing GitHub REST and GraphQL API endpoints against GitHub Enterprise EMU (or any GitHub instance). Built for developers and admins who need to discover, test, and debug API calls without leaving the browser.
 
-**1,107 endpoints** auto-imported from GitHub's official OpenAPI spec across 47 categories — every REST API endpoint available out of the box.
+**1,100+ endpoints** auto-imported from GitHub's official OpenAPI spec across 47 categories — every REST API endpoint available out of the box.
 
 ## Features
 
@@ -10,12 +10,16 @@ A browser-based test harness for exploring and executing GitHub REST API endpoin
 - **Full API catalog** — auto-imported from GitHub's OpenAPI spec with search (`⌘K`) across all endpoints
 - **Auto-populated parameters** — `{org}`, `{owner}`, `{enterprise}` fill from your environment config
 - **Endpoint documentation** — summary, description, required scopes, callouts, and doc links inline
+- **GraphQL editor** — query editor with example queries, variables panel, resizable results, and beginner guide
+- **API version comparison** — import multiple API spec versions (cloud, GHES 3.10, 3.20, etc.) and diff them
 - **Dual auth** — Personal Access Token (PAT) or GitHub App (JWT + installation token)
 - **Response viewer** — collapsible JSON tree, headers, raw, and **Preview** tab with clickable URLs
 - **Pagination** — "Load More" button for paginated responses (parses `Link` header)
 - **Rate limit monitoring** — live bar in the top nav
-- **Request history** — searchable log with replay
-- **Collections** — save and organize requests into reusable groups
+- **Request history** — searchable log with category, expandable details (path params, query params, request body), replay, and add-to-collection
+- **Collections** — save and organize requests into reusable groups with resolved URLs and full request details
+- **Templates** — reusable request templates for common workflows
+- **Webhook reference** — browse all webhook event types with actions, payload fields, and headers
 - **Multi-environment** — switch between customers/instances without reconfiguring
 - **Dark/light theme** — GitHub Primer design language, dark mode default
 - **SSRF protection** — all API calls proxied through the backend, validated against configured base URL
@@ -33,8 +37,8 @@ A browser-based test harness for exploring and executing GitHub REST API endpoin
 
 ```bash
 # Clone the repo
-git clone https://github.com/ThomasIverson/ghe-rest-harness.git
-cd ghe-rest-harness
+git clone https://github.com/thomasiverson/github-api-explorer.git
+cd github-api-explorer
 
 # Install dependencies
 npm install
@@ -126,27 +130,38 @@ You can configure multiple environments in Settings — each with its own base U
 src/
 ├── app/
 │   ├── api/
+│   │   ├── collections/  # Collections CRUD + items
+│   │   ├── compare/      # API version comparison + diff
 │   │   ├── endpoints/    # Endpoint catalog queries
 │   │   ├── environments/ # Environment CRUD + auth validation
 │   │   ├── execute/      # Request proxy (SSRF-protected)
-│   │   ├── history/      # Request history CRUD
-│   │   └── import/       # OpenAPI spec re-import
-│   ├── collections/      # Collections page
-│   ├── history/          # History page
-│   ├── settings/         # Environment & auth config
+│   │   ├── favorites/    # Favorite endpoints
+│   │   ├── graphql/      # GraphQL query proxy
+│   │   ├── history/      # Request history CRUD + category backfill
+│   │   ├── import/       # OpenAPI spec import
+│   │   └── variables/    # Environment variables
+│   ├── collections/      # Collections management page
+│   ├── compare/          # API version comparison page
+│   ├── graphql/          # GraphQL query editor
+│   ├── history/          # Request history with expandable details
+│   ├── settings/         # Environment, auth config, API catalog
+│   ├── templates/        # Request templates
+│   ├── webhooks/         # Webhook event reference
 │   └── page.tsx          # Main three-panel workspace
 ├── components/
 │   ├── AppContext.tsx     # Global state (environment, endpoint, response)
-│   ├── TopBar.tsx         # Nav bar, env selector, auth status, rate limit
+│   ├── TopBar.tsx         # Two-row header: branding + nav with active indicators
 │   ├── Sidebar.tsx        # API explorer with category tree + search
 │   ├── RequestBuilder.tsx # URL bar, params, body editor, endpoint docs
 │   ├── ResponseViewer.tsx # JSON tree, headers, raw, preview tabs
 │   └── ResizablePanels.tsx# Drag-to-resize panel layout
 ├── lib/
 │   ├── auth.ts           # Octokit factory (PAT + GitHub App)
-│   ├── db.ts             # SQLite schema, CRUD, encryption
+│   ├── db.ts             # SQLite schema, CRUD, encryption, category lookup
 │   ├── openapi-import.ts # OpenAPI spec parser
-│   └── types.ts          # TypeScript interfaces
+│   ├── templates.ts      # Request template definitions
+│   ├── types.ts          # TypeScript interfaces
+│   └── webhooks.ts       # Webhook event definitions
 scripts/
 └── import-openapi.ts     # CLI for importing the API catalog
 data/
