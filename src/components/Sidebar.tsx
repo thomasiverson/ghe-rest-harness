@@ -51,6 +51,7 @@ export function Sidebar() {
   const [specVersions, setSpecVersions] = useState<Array<{ spec_version: string; count: number }>>([]);
   const [selectedVersion, setSelectedVersion] = useState<string>('api.github.com');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -242,7 +243,7 @@ export function Sidebar() {
       {/* Header */}
       <div className="p-3 border-b border-border">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+          <span className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
             API Explorer
             <span className="ml-1.5 text-text-muted font-normal">({totalCount})</span>
           </span>
@@ -266,13 +267,13 @@ export function Sidebar() {
               className="text-[11px] text-text-muted hover:text-text-primary">Clear</button>
           </div>
         )}
-        <p className="text-[10px] text-text-muted mt-1">Ctrl+click to multi-select</p>
+        <p className="text-xs text-text-muted mt-1">Ctrl+click to multi-select</p>
         {/* Version filter */}
         {specVersions.length > 1 && (
           <select
             value={selectedVersion}
             onChange={e => { setSelectedVersion(e.target.value); loadCategories(e.target.value); }}
-            className="mt-2 w-full bg-surface border border-border rounded-md px-2 py-1 text-[11px] text-text-primary
+            className="mt-2 w-full bg-surface border border-border rounded-md px-2 py-1 text-xs text-text-primary
                        focus:outline-none focus:ring-1 focus:ring-accent"
           >
             <option value="">All versions ({totalCount})</option>
@@ -281,7 +282,7 @@ export function Sidebar() {
             ))}
           </select>
         )}
-        <p className="text-[10px] text-text-muted mt-2">
+        <p className="text-xs text-text-muted mt-2">
           Import additional API specs via <a href="/compare" className="text-accent hover:underline">Compare</a> or <a href="/settings" className="text-accent hover:underline">Settings</a>
         </p>
       </div>
@@ -341,10 +342,17 @@ export function Sidebar() {
             {/* Favorites section */}
             {favoriteEndpoints.length > 0 && (
               <div className="mb-1">
-                <div className="px-3 py-1.5 text-xs font-semibold text-warning uppercase tracking-wider flex items-center gap-1">
-                  ★ Favorites
-                </div>
-                {favoriteEndpoints.map(ep => (
+                <button
+                  onClick={() => setFavoritesExpanded(!favoritesExpanded)}
+                  className="w-full px-3 py-1.5 text-xs font-semibold text-warning uppercase tracking-wider flex items-center gap-1 hover:bg-surface/50 transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"
+                    className={`text-text-muted transition-transform ${favoritesExpanded ? 'rotate-90' : ''}`}>
+                    <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z" />
+                  </svg>
+                  ★ Favorites <span className="text-text-muted font-normal">({favoriteEndpoints.length})</span>
+                </button>
+                {favoritesExpanded && favoriteEndpoints.map(ep => (
                   <EndpointItem
                     key={`fav-${ep.id}`}
                     endpoint={ep}
@@ -439,7 +447,7 @@ function EndpointItem({
       {onToggleFavorite && (
         <span
           onClick={e => { e.stopPropagation(); onToggleFavorite(); }}
-          className={`shrink-0 text-xs cursor-pointer transition-opacity ${
+          className={`shrink-0 text-sm cursor-pointer transition-opacity ${
             isFavorite ? 'text-warning opacity-100' : 'text-text-muted opacity-0 group-hover:opacity-50 hover:!opacity-100'
           }`}
           title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}

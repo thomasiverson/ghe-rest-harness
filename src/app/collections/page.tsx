@@ -37,6 +37,9 @@ export default function CollectionsPage() {
   const [newDesc, setNewDesc] = useState('');
   const [runResults, setRunResults] = useState<RunResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [missingParams, setMissingParams] = useState<Record<string, string>>({});
+  const [showParamPrompt, setShowParamPrompt] = useState(false);
+  const [expandedResult, setExpandedResult] = useState<string | null>(null);
 
   useEffect(() => { loadCollections(); }, []);
 
@@ -126,7 +129,42 @@ export default function CollectionsPage() {
     });
   }
 
-  async function runAll() {
+  // Known auto-fill params
+  const autoFillParams: Record<string, string> = {};
+  if (activeEnv) {
+    autoFillParams['org'] = activeEnv.org_name || activeEnv.enterprise_slug || '';
+    autoFillParams['organization'] = activeEnv.org_name || activeEnv.enterprise_slug || '';
+    autoFillParams['owner'] = activeEnv.org_name || activeEnv.enterprise_slug || '';
+    autoFillParams['enterprise'] = activeEnv.enterprise_slug || '';
+  }
+
+  function detectMissingParams(): Record<string, string> {
+    const missing: Record<string, string> = {};
+    for (const item of items) {
+      const storedParams = JSON.parse(item.path_params || '{}') as Record<string, string>;
+      const placeholders = item.path.match(/\{([\w-]+)\}/g) || [];
+      for (const ph of placeholders) {
+        const name = ph.slice(1, -1);
+        if (storedParams[name]) continue;
+        if (autoFillParams[name]) continue;
+        if (!(name in missing)) missing[name] = '';
+      }
+    }
+    return missing;
+  }
+
+  function handleRunAll() {
+    const missing = detectMissingParams();
+    if (Object.keys(missing).length > 0) {
+      setMissingParams(missing);
+      setShowParamPrompt(true);
+    } else {
+      runAll({});
+    }
+  }
+
+  async function runAll(extraParams: Record<string, string>) {
+    setShowParamPrompt(false);
     if (!selectedId || items.length === 0) return;
     setIsRunning(true);
     setRunResults([]);
@@ -143,7 +181,9 @@ export default function CollectionsPage() {
           for (const ph of placeholders) {
             const name = ph.slice(1, -1);
             if (pathParams[name]) continue; // already has a value
-            if (name === 'org' || name === 'organization' || name === 'owner') {
+            if (extraParams[name]) {
+              pathParams[name] = extraParams[name];
+            } else if (name === 'org' || name === 'organization' || name === 'owner') {
               pathParams[name] = activeEnv.org_name || activeEnv.enterprise_slug || '';
             } else if (name === 'enterprise') {
               pathParams[name] = activeEnv.enterprise_slug || '';
@@ -177,6 +217,91 @@ export default function CollectionsPage() {
       setRunResults([...results]);
     }
     setIsRunning(false);
+  }
+
+  function exportResultsHtml() {
+    if (!selected || runResults.length === 0) return;
+    const passed = runResults.filter(r => r.status >= 200 && r.status < 300).length;
+    const failed = runResults.filter(r => r.status === 0 || r.status >= 400).length;
+    const totalTime = Math.round(runResults.reduce((a, r) => a + r.timing, 0));
+    const envName = activeEnv?.name || 'Unknown';
+    const envUrl = activeEnv?.base_url || '';
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${selected.name} — Results</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:1000px;margin:0 auto;padding:2rem;color:#1f2328;background:#fff}
+h1{font-size:1.5rem;margin-bottom:0.25rem}
+.meta{color:#656d76;font-size:13px;margin-bottom:1.5rem}
+.summary{display:flex;gap:1rem;margin:1rem 0 1.5rem}
+.card{flex:1;text-align:center;padding:1rem;border:1px solid #d0d7de;border-radius:8px}
+.card .num{font-size:1.5rem;font-weight:700}
+.pass{color:#1a7f37}.fail{color:#d1242f}
+.result{border:1px solid #d0d7de;border-radius:8px;margin-bottom:0.75rem;overflow:hidden}
+.result-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f6f8fa;border-bottom:1px solid #d0d7de;font-size:13px}
+.result-header .method{font-weight:700;font-size:11px;padding:2px 6px;border-radius:4px;color:#fff}
+.get{background:#1a7f37}.post{background:#0969da}.put{background:#9a6700}.patch{background:#bc4c00}.delete{background:#d1242f}
+.result-header .path{font-family:monospace;flex:1}
+.result-header .status{font-weight:700}
+.result-header .timing{color:#656d76}
+.result-body{padding:12px 14px}
+.result-body .section-label{font-size:11px;font-weight:600;color:#656d76;text-transform:uppercase;margin:8px 0 4px}
+.result-body .section-label:first-child{margin-top:0}
+.result-body .params{font-family:monospace;font-size:12px;color:#1f2328}
+.result-body .params span{color:#656d76}
+.result-body pre{background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;padding:10px;font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.error{color:#d1242f;font-size:12px}
+.summary-text{font-size:12px;color:#656d76;margin-top:4px}
+@media print{body{padding:0}.result-body pre{max-height:none}}
+</style></head><body>
+<h1>${escapeHtml(selected.name)}</h1>
+<div class="meta">
+${escapeHtml(selected.description)}<br>
+Environment: ${escapeHtml(envName)} (${escapeHtml(envUrl)})<br>
+Generated: ${new Date().toLocaleString()}
+</div>
+<div class="summary">
+<div class="card"><div class="num pass">${passed}</div>Passed</div>
+<div class="card"><div class="num fail">${failed}</div>Failed</div>
+<div class="card"><div class="num">${runResults.length}</div>Total</div>
+<div class="card"><div class="num">${totalTime}ms</div>Duration</div>
+</div>
+${runResults.map(r => {
+  const item = items.find(i => i.id === r.itemId);
+  const info = describeEndpoint(r.path || '');
+  const isSuccess = r.status >= 200 && r.status < 300;
+  const pathParams = item ? JSON.parse(item.path_params || '{}') : {};
+  const queryParams = item ? JSON.parse(item.query_params || '{}') : {};
+  const hasPathParams = Object.keys(pathParams).length > 0;
+  const hasQueryParams = Object.keys(queryParams).filter(k => queryParams[k]).length > 0;
+  const hasBody = item?.body && ['POST', 'PUT', 'PATCH'].includes(item.method);
+  const resolvedPath = item ? item.path.replace(/\\{([\\w-]+)\\}/g, (_: string, key: string) => pathParams[key] || `{${key}}`) : r.path;
+
+  return `<div class="result">
+<div class="result-header">
+<span class="method ${(item?.method || 'GET').toLowerCase()}">${item?.method || 'GET'}</span>
+<span class="path">${escapeHtml(resolvedPath || '')}</span>
+<span class="status" style="color:${isSuccess ? '#1a7f37' : '#d1242f'}">${r.status || 'ERR'}</span>
+<span class="timing">${r.timing}ms</span>
+</div>
+<div class="result-body">
+<div class="summary-text"><strong>${escapeHtml(info.title)}</strong> — ${isSuccess ? escapeHtml(summarizeResponse(r.path || '', r.responseBody)) : `<span class="error">${escapeHtml(r.error || 'HTTP ' + r.status)}</span>`}</div>
+${hasPathParams ? `<div class="section-label">Path Parameters</div><div class="params">${Object.entries(pathParams).map(([k, v]) => `<span>${k}:</span> ${escapeHtml(String(v))}`).join(' &nbsp; ')}</div>` : ''}
+${hasQueryParams ? `<div class="section-label">Query Parameters</div><div class="params">${Object.entries(queryParams).filter(([, v]) => v).map(([k, v]) => `<span>${k}:</span> ${escapeHtml(String(v))}`).join(' &nbsp; ')}</div>` : ''}
+${hasBody ? `<div class="section-label">Request Body</div><pre>${escapeHtml(formatJson(item!.body!))}</pre>` : ''}
+${r.responseBody ? `<div class="section-label">Response</div><pre>${escapeHtml(JSON.stringify(r.responseBody, null, 2))}</pre>` : ''}
+</div>
+</div>`;
+}).join('')}
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selected.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}-results.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const selected = collections.find(c => c.id === selectedId);
@@ -244,16 +369,57 @@ export default function CollectionsPage() {
                     className="text-sm bg-transparent text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent rounded px-1 -ml-1 w-full" />
                 </div>
                 <div className="flex gap-2 ml-4">
-                  <button onClick={runAll} disabled={isRunning || items.length === 0}
+                  <button onClick={handleRunAll} disabled={isRunning || items.length === 0}
                     className="px-3 py-1.5 bg-accent-emphasis text-white text-sm rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity">
                     {isRunning ? 'Running...' : `Run All (${items.length})`}
                   </button>
+                  {runResults.length > 0 && (
+                    <button onClick={exportResultsHtml}
+                      className="px-3 py-1.5 text-sm border border-border rounded-md text-text-secondary hover:bg-surface transition-colors">
+                      Export HTML
+                    </button>
+                  )}
                   <button onClick={() => deleteColl(selected.id)}
                     className="px-3 py-1.5 text-danger text-sm border border-border rounded-md hover:bg-surface transition-colors">
                     Delete
                   </button>
                 </div>
               </div>
+
+              {/* Missing params prompt */}
+              {showParamPrompt && (
+                <div className="mb-4 bg-panel border border-accent/30 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-text-primary mb-2">Fill in required parameters</h3>
+                  <p className="text-xs text-text-secondary mb-3">These parameters are needed but not yet configured:</p>
+                  <div className="space-y-2">
+                    {Object.entries(missingParams).map(([name, value]) => (
+                      <div key={name} className="flex items-center gap-3">
+                        <label className="text-sm font-mono text-text-secondary w-32 shrink-0">{`{${name}}`}</label>
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={e => setMissingParams(prev => ({ ...prev, [name]: e.target.value }))}
+                          placeholder={`Enter ${name}...`}
+                          className="flex-1 bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-text-primary font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => runAll(missingParams)}
+                      disabled={Object.values(missingParams).some(v => !v.trim())}
+                      className="px-3 py-1.5 bg-accent-emphasis text-white text-sm rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity">
+                      Run All
+                    </button>
+                    <button
+                      onClick={() => setShowParamPrompt(false)}
+                      className="px-3 py-1.5 text-text-secondary text-sm border border-border rounded-md hover:bg-surface transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Run results summary */}
               {runResults.length > 0 && (
@@ -264,13 +430,15 @@ export default function CollectionsPage() {
                     <span className="text-text-muted">{Math.round(runResults.reduce((a, r) => a + r.timing, 0))}ms total</span>
                   </div>
                   {/* Key findings */}
-                  <div className="p-3 space-y-3">
+                  <div className="p-3 space-y-1">
                     {runResults.map(r => {
                       const info = describeEndpoint(r.path || '');
                       const isSuccess = r.status >= 200 && r.status < 300;
+                      const isResultExpanded = expandedResult === r.itemId;
                       return (
                         <div key={r.itemId} className="text-xs">
-                          <div className="flex items-start gap-2">
+                          <div className="flex items-start gap-2 cursor-pointer hover:bg-surface/50 rounded p-1 -m-1 transition-colors"
+                            onClick={() => setExpandedResult(isResultExpanded ? null : r.itemId)}>
                             <span className={`shrink-0 mt-0.5 ${isSuccess ? 'text-success' : 'text-danger'}`}>
                               {isSuccess ? '✓' : '✗'}
                             </span>
@@ -290,7 +458,18 @@ export default function CollectionsPage() {
                               )}
                             </div>
                             <span className="text-text-muted shrink-0">{r.timing}ms</span>
+                            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"
+                              className={`text-text-muted transition-transform shrink-0 mt-0.5 ${isResultExpanded ? 'rotate-90' : ''}`}>
+                              <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z" />
+                            </svg>
                           </div>
+                          {isResultExpanded && r.responseBody && (
+                            <div className="mt-2 ml-5">
+                              <pre className="text-[11px] font-mono text-text-secondary whitespace-pre-wrap break-all max-h-96 overflow-auto bg-canvas rounded p-3 border border-border">
+                                {JSON.stringify(r.responseBody, null, 2)}
+                              </pre>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -412,6 +591,14 @@ export default function CollectionsPage() {
       </div>
     </div>
   );
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatJson(str: string): string {
+  try { return JSON.stringify(JSON.parse(str), null, 2); } catch { return str; }
 }
 
 function describeEndpoint(path: string): { title: string; errorHint: string } {

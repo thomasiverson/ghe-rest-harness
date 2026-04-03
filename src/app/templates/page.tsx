@@ -73,7 +73,7 @@ export default function TemplatesPage() {
     <div className="h-full flex flex-col">
       <TopBar />
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto py-8 px-6">
+        <div className="max-w-6xl mx-auto py-8 px-6">
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-text-primary">Request Templates</h1>
             <p className="text-sm text-text-secondary mt-1">
@@ -82,7 +82,7 @@ export default function TemplatesPage() {
           </div>
 
           {/* How it works */}
-          <div className="bg-surface/50 border border-border rounded-lg p-4 flex gap-6">
+          <div className="bg-surface/50 border border-border rounded-lg p-4 flex gap-6 mb-3">
             <div className="flex items-center gap-2 text-xs text-text-secondary">
               <span className="w-5 h-5 rounded-full bg-accent-emphasis text-white flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
               <span><strong>Import</strong> a template below</span>
@@ -101,7 +101,7 @@ export default function TemplatesPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {templates.map(t => {
               const isExpanded = expandedId === t.id;
               const isImported = imported.has(t.id);
@@ -149,10 +149,10 @@ export default function TemplatesPage() {
                       <div className="px-4 pb-3 space-y-1">
                         {t.items.map((item, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs">
-                            <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${METHOD_COLORS[item.method]} leading-none`}>
+                            <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${METHOD_COLORS[item.method]} leading-none shrink-0`}>
                               {item.method}
                             </span>
-                            <span className="font-mono text-text-secondary truncate">{item.path}</span>
+                            <span className="font-mono text-[11px] text-text-secondary">{item.path}</span>
                           </div>
                         ))}
                       </div>
