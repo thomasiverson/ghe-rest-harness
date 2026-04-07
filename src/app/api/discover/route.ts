@@ -137,10 +137,14 @@ export async function GET(request: NextRequest) {
           enterprise,
           per_page: 100,
         });
-        results = (data as Array<{ slug: string; name: string; description?: string | null }>).map(t => ({
-          value: t.slug,
-          label: t.description ? `${t.name} — ${t.description}` : t.name,
-        }));
+        results = (data as Array<{ slug: string; name: string; id: number; description?: string | null }>).map(t => {
+          // Enterprise team slugs often have "ent:" prefix — strip it for the path param
+          const cleanSlug = t.slug.replace(/^ent:/, '');
+          return {
+            value: cleanSlug,
+            label: t.description ? `${t.name} — ${t.description}` : t.name,
+          };
+        });
         break;
       }
 
