@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from './AppContext';
 import { ConfirmDialog, isDestructiveMethod, getConfirmMessage } from './ConfirmDialog';
-import { ParamCombobox, isDiscoverableParam } from './ParamCombobox';
+import { ParamCombobox, isDiscoverableParam, getDiscoveryConfig } from './ParamCombobox';
 
 const METHOD_BG: Record<string, string> = {
   GET: 'bg-method-get', POST: 'bg-method-post',
@@ -527,9 +527,40 @@ export function RequestBuilder() {
                     className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text-primary font-mono
                                resize-y focus:outline-none focus:ring-1 focus:ring-accent placeholder-text-muted"
                   />
-                  <p className="text-[10px] text-text-muted">
-                    The Send button above will run {batchValues.split('\n').filter(l => l.trim()).length} requests. Results appear in the response panel →
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] text-text-muted flex-1">
+                      The Send button above will run {batchValues.split('\n').filter(l => l.trim()).length} requests. Results appear in the response panel →
+                    </p>
+                    {isDiscoverableParam(batchParam || selectedEndpoint.pathParams[0]?.name || '') && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const paramName = batchParam || selectedEndpoint.pathParams[0]?.name || '';
+                          const config = getDiscoveryConfig(paramName);
+                          if (!config) return;
+                          const params = new URLSearchParams({ type: config.type });
+                          if (config.dependsOn && config.paramMapping) {
+                            for (const dep of config.dependsOn) {
+                              const val = pathValues[dep]?.trim();
+                              if (val && config.paramMapping[dep]) {
+                                params.set(config.paramMapping[dep], val);
+                              }
+                            }
+                          }
+                          try {
+                            const res = await fetch(`/api/discover?${params.toString()}`);
+                            if (res.ok) {
+                              const data = await res.json() as Array<{ value: string }>;
+                              setBatchValues(data.map(d => d.value).join('\n'));
+                            }
+                          } catch { /* ignore */ }
+                        }}
+                        className="text-[10px] text-accent hover:text-accent-emphasis whitespace-nowrap"
+                      >
+                        Fill all from API
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
