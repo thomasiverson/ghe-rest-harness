@@ -48,6 +48,7 @@ export function ParamCombobox({ paramName, value, onChange, allParamValues, plac
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -101,6 +102,10 @@ export function ParamCombobox({ paramName, value, onChange, allParamValues, plac
   useEffect(() => {
     if (open && options.length === 0 && !loading && !error) {
       fetchOptions();
+    }
+    if (open && wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
     }
   }, [open, options.length, loading, error, fetchOptions]);
 
@@ -179,7 +184,10 @@ export function ParamCombobox({ paramName, value, onChange, allParamValues, plac
       </div>
 
       {open && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-panel border border-border rounded-md shadow-lg max-h-48 overflow-auto">
+        <div
+          className="fixed z-[200] bg-panel border border-border rounded-md shadow-lg max-h-48 overflow-auto"
+          style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+        >
           {loading && options.length === 0 && (
             <div className="px-3 py-2 text-xs text-text-muted">Loading...</div>
           )}
