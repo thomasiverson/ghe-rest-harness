@@ -39,3 +39,5 @@ See [docs/GUIDE.md](docs/GUIDE.md) for detailed setup, usage, configuration, and
 ## Security
 
 Credentials encrypted at rest (AES-256). All API calls proxied through the backend with SSRF protection. Tokens never reach the browser.
+
+## Testing
