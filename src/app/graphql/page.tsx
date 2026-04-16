@@ -211,6 +211,18 @@ export default function GraphQLPage() {
   return (
     <div className="h-full flex flex-col">
       <TopBar />
+
+      {/* Sub-navigation */}
+      <div className="border-b border-border bg-panel px-6 flex items-center gap-1">
+        <span className="px-3 py-2 text-sm text-text-primary bg-surface border border-border border-b-0 rounded-t-md font-medium -mb-px">
+          Query Editor
+        </span>
+        <a href="/graphql/batch-orgs"
+          className="px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-surface rounded-t-md transition-colors">
+          Batch Create Orgs
+        </a>
+      </div>
+
       <div ref={containerRef} className="flex-1 flex overflow-hidden">
         {/* Left: Query editor */}
         <div style={{ width: `${leftPct}%` }} className="flex flex-col border-r border-border min-w-0 shrink-0">

@@ -9,7 +9,11 @@ export function TopBar() {
   const pathname = usePathname();
 
   const navLinkClass = (href: string) => {
-    const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+    const isActive = href === '/'
+      ? pathname === '/'
+      : href === '/graphql'
+        ? pathname === '/graphql'
+        : pathname.startsWith(href);
     return isActive
       ? 'px-3 py-1 text-sm text-text-primary bg-[var(--nav-active-bg)] border border-[var(--nav-active-border)] rounded-md font-medium'
       : 'px-3 py-1 text-sm text-text-secondary hover:text-text-primary hover:bg-surface rounded-md transition-colors';
@@ -168,6 +172,7 @@ export function TopBar() {
         <a href="/templates" className={navLinkClass('/templates')}>Templates</a>
         <a href="/webhooks" className={navLinkClass('/webhooks')}>Webhooks</a>
         <a href="/graphql" className={navLinkClass('/graphql')}>GraphQL</a>
+        <a href="/graphql/batch-orgs" className={navLinkClass('/graphql/batch-orgs')}>Batch Create Orgs</a>
         <a href="/settings" className={navLinkClass('/settings')}>Settings</a>
       </nav>
     </header>
